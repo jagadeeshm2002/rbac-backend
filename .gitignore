@@ -1,0 +1,40 @@
+# Node.js Dependencies
+node_modules/
+
+
+# Logs
+logs/
+
+
+# Environment Variables
+.env
+
+# Build Output
+dist/
+build/
+out/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage Reports
+coverage/
+
+# Debug Files
+*.pid
+*.seed
+
+
+
+
+
+# OS-Specific Files
+*.~lock.*
+*.bak
