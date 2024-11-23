@@ -6,13 +6,17 @@ import jwt from "jsonwebtoken";
 
 const signin = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    const { username, email, password } = req.body;
+    if ((!email && !username) || !password) {
       return res
         .status(400)
-        .json({ message: "Please provide email and password" });
+        .json({ message: "Please provide username or email and password" });
     }
-    const user = await User.findOne<IUser>({ email }).populate("role");
+
+    const query = {
+      $or: [{ username: username || "" }, { email: email || "" }],
+    };
+    const user = await User.findOne<IUser>(query).populate("role");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -28,6 +32,7 @@ const signin = async (req: Request, res: Response) => {
     }
 
     const payload: jwtPayload = {
+      username: user.username,
       email: user.email,
       role: user.role,
     };
@@ -40,7 +45,7 @@ const signin = async (req: Request, res: Response) => {
       sameSite: "none",
     });
 
-    return res.status(200).json({ accessToken, refreshToken });
+    return res.status(200).json({ accessToken });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error" });
   }
@@ -62,11 +67,14 @@ const refresh = async (req: Request, res: Response) => {
     if (!user.isActive) {
       return res.status(401).json({ message: "User is inactive" });
     }
-    const newAccessToken = jwt.sign(
-      { email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: "1d" }
-    );
+    const jwtPayload: jwtPayload = {
+      username: user.username,
+      email: user.email,
+      role: user.role,
+    };
+    const newAccessToken = jwt.sign(jwtPayload, process.env.JWT_SECRET!, {
+      expiresIn: "1d",
+    });
     return res.status(200).json({ newAccessToken });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error" });
