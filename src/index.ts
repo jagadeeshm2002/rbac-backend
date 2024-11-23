@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(cors());
 const port = process.env.SERVER_PORT || 3000;
 
-app.use("/api",routes);
+app.use("/api", routes);
 
 mongoose.connection.once("open", () => {
   console.log("Connected to MongoDB");
