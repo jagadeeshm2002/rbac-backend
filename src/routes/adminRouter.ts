@@ -37,8 +37,8 @@ router.post(
   addNewRole
 );
 router.put(
-  "/role",
-  rolePermissionsValid(["admin"], "update"),
+  "/role/:id",
+  // rolePermissionsValid(["admin"], "update"),
   validate(zupdateRole),
   updateRole
 );

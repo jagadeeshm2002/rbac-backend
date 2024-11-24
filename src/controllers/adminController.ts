@@ -153,12 +153,6 @@ const updateRole = async (req: Request, res: Response) => {
     if (!id) {
       return res.status(400).json({ message: "Role ID is required" });
     }
-    if (!name) {
-      return res.status(400).json({ message: "Role name is required" });
-    }
-    if (!permissions) {
-      return res.status(400).json({ message: "Role permissions are required" });
-    }
     const existingRole = await RolePermissions.findById(id);
     if (!existingRole) {
       return res.status(404).json({ message: "Role not found" });
