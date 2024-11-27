@@ -1,6 +1,7 @@
 import { User } from "../models/user.schema";
 import { Response, Request } from "express";
 import {
+  customRequest,
   getAllUserQuery,
   IRolePermissionsDocument,
   IUser,
@@ -31,10 +32,11 @@ const getAllUsers = async (req: Request, res: Response) => {
     if (role) query.role = role;
     if (isActive) query.isActive = isActive === "true";
     const users = await User.find<IUser>(query)
-      .populate("role")
+      .populate("role",
+        "_id name permissions isActive")
       .skip(skip)
       .limit(limit)
-      .select("-password")
+      .select("-password -__v -updatedAt")
       .sort({ createdAt: -1 });
     const total = await User.countDocuments(query);
     return res.status(200).json({
@@ -49,7 +51,8 @@ const getUserById = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const user = await User.findById<IUser>(id)
-      .populate("role")
+      .populate("role",
+        "_id name permissions isActive")
       .select("-password");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -139,9 +142,9 @@ const updateUser = async (req: Request, res: Response) => {
         return res.status(409).json({ message: "Username is already in use" });
       }
     }
-    if (isActive == user.isActive) {
-      return res.status(409).json({ message: `user already ${isActive}` });
-    }
+    // if (isActive == user.isActive) {
+    //   return res.status(409).json({ message: `user already ${isActive}` });
+    // }
 
     const role = roleName
       ? await RolePermissions.findOne<IRolePermissionsDocument>({
@@ -155,7 +158,8 @@ const updateUser = async (req: Request, res: Response) => {
       { new: true }
     );
 
-    const populatedUser = updatedUser && (await updatedUser.populate("role"));
+    const populatedUser = updatedUser && (await updatedUser.populate("role",
+      "_id name permissions isActive"));
 
     return res
       .status(200)
@@ -164,9 +168,23 @@ const updateUser = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-const deleteUser = async (req: Request, res: Response) => {
+const deleteUser = async (req:Request, res: Response) => {
   try {
     const userId = req.params.id;
+    const loginId = req.body.loginId
+
+    if (!userId || !loginId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+    const loginUser = await User.findById<IUserDocument>(loginId);
+    if (!loginUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    if (userId === loginId) {
+      return res.status(400).json({ message: "You cannot delete yourself" });
+    }
+    
     const user = await User.findByIdAndDelete<IUserDocument>(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });

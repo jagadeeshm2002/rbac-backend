@@ -25,7 +25,7 @@ export const zuserAddSchema = z.object({
       .max(20),
     email: z.string({ required_error: "Email is required" }).email(),
     password: z.string({ required_error: "Password is required" }).min(6),
-    role: role,
+    role: role.optional().default("user"),
     isActive: z.boolean().optional(),
   }),
 });
@@ -105,6 +105,8 @@ export const zupdateRole = z.object({
         .max(20)
         .optional(),
       permissions: z.array(z.string()).min(1).optional(),
+      isActive: z.boolean().optional(),
+     
     })
     .refine((data) => data.name || data.permissions, {
       message: "Either name or permissions must be provided",

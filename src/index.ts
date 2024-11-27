@@ -4,12 +4,15 @@ import cors from "cors";
 import connectDB from "./config/db";
 import mongoose from "mongoose";
 import routes from "./routes";
+import { corsOptions } from "./config/corsOptions";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 connectDB();
 const app: Express = express();
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+app.use(cors(corsOptions));
 const port = process.env.SERVER_PORT || 3000;
 
 app.use("/api", routes);

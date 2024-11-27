@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   addNewRole,
   exportUsersToCsv,
+  exportUsersToExcel,
   getAllRoles,
   getStats,
   updateRole,
@@ -24,6 +25,10 @@ router.get(
   validate(zexportUsersToCsv),
   exportUsersToCsv
 );
+router.get(
+  "/getuserexcel",rolePermissionsValid(["admin"], "read"),
+  exportUsersToExcel
+)
 router.get(
   "/stats",
   rolePermissionsValid(["admin"], "read"),

@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import { User } from "../models/user.schema";
 import { json2csv } from "json-2-csv";
+import * as ExcelJS from "exceljs";
 import {
+  ExportQuery,
   IRolePermissions,
   IRolePermissionsDocument,
   IUserDocument,
@@ -37,11 +39,22 @@ const prepareUserExportData = (users: IUserDocument[]): FlattenedUser[] => {
 const exportUsersToCsv = async (req: Request, res: Response) => {
   try {
     // Optional query parameters for filtering
-    const { isActive, role, startDate, endDate } = req.query;
+    const { isActive, role, startDate, endDate }: ExportQuery = req.query;
+    if (startDate && isNaN(Date.parse(startDate as string))) {
+      return res.status(400).json({
+        message: "Invalid start date format",
+      });
+    }
+
+    if (endDate && isNaN(Date.parse(endDate as string))) {
+      return res.status(400).json({
+        message: "Invalid end date format",
+      });
+    }
 
     // Construct dynamic query
     const query: any = {};
-    if (isActive) query.isActive =isActive === "true";
+    if (isActive) query.isActive = isActive === "true";
     if (role) query["role.name"] = role;
     if (startDate || endDate) {
       query.createdAt = {};
@@ -51,7 +64,7 @@ const exportUsersToCsv = async (req: Request, res: Response) => {
 
     // Fetch users with optional filtering
     const users = await User.find<IUserDocument>(query)
-      .populate("role")
+      .populate("role", "_id name permissions isActive")
       .select("-password");
 
     // Prepare flattened data
@@ -79,10 +92,132 @@ const exportUsersToCsv = async (req: Request, res: Response) => {
     // Send CSV
     res.send(csv);
   } catch (error) {
-    console.error("CSV Export Error:", error);
+    // Enhanced error logging
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown export error";
+
+    console.error("Users Export Error:", {
+      timestamp: new Date().toISOString(),
+      error: errorMessage,
+      query: req.query,
+    });
+
     res.status(500).json({
-      message: "Internal server error",
-      error: error instanceof Error ? error.message : "Unknown error",
+      message: "Failed to export users",
+      error: errorMessage,
+    });
+  }
+};
+const exportUsersToExcel = async (req: Request, res: Response) => {
+  try {
+    // Optional query parameters for filtering
+    const { isActive, role, startDate, endDate }: ExportQuery = req.query;
+
+    if (startDate && isNaN(Date.parse(startDate as string))) {
+      return res.status(400).json({
+        message: "Invalid start date format",
+      });
+    }
+
+    if (endDate && isNaN(Date.parse(endDate as string))) {
+      return res.status(400).json({
+        message: "Invalid end date format",
+      });
+    }
+
+    // Construct dynamic query
+    const query: any = {};
+    if (isActive) query.isActive = isActive === "true";
+    if (role) query["role.name"] = role;
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate as string);
+      if (endDate) query.createdAt.$lte = new Date(endDate as string);
+    }
+
+    // Fetch users with optional filtering
+    const users = await User.find<IUserDocument>(query)
+      .populate("role", "_id name permissions isActive")
+      .select("-password");
+
+    // Prepare flattened data
+    const flattenedUsers = prepareUserExportData(users);
+
+    // Manually define headers if extractUniqueFields is unreliable
+    const defaultHeaders = [
+      "_id",
+      "username",
+      "email",
+      "isActive",
+      "createdAt",
+      "updatedAt",
+      "roleName",
+      "rolePermissions",
+    ];
+
+    // Use default headers or fall back to Object.keys if flattenedUsers exists
+    const headers =
+      flattenedUsers.length > 0
+        ? Object.keys(flattenedUsers[0])
+        : defaultHeaders;
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Users", {
+      properties: {
+        tabColor: { argb: "FF00FF00" },
+      },
+    });
+
+    // Style headers
+    worksheet.columns = headers.map((header) => ({
+      header,
+      key: header,
+      width: 20, // Set column width
+    }));
+
+    worksheet.getRow(1).font = {
+      bold: true,
+      color: { argb: "FFFFFF" },
+      size: 12,
+    };
+    worksheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "4467B4" },
+    };
+
+    // Add data rows with formatting
+    worksheet.addRows(flattenedUsers);
+
+    // Optional: Add auto filters
+    worksheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: headers.length },
+    };
+
+    // Stream response for large files
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", 'attachment; filename="users.xlsx"');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    // Enhanced error logging
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown export error";
+
+    console.error("Users Export Error:", {
+      timestamp: new Date().toISOString(),
+      error: errorMessage,
+      query: req.query,
+    });
+
+    res.status(500).json({
+      message: "Failed to export users",
+      error: errorMessage,
     });
   }
 };
@@ -111,11 +246,20 @@ const getStats = async (req: Request, res: Response) => {
         },
       },
     ]);
+    const totalRoles = await RolePermissions.countDocuments();
+    const activeRoles = await RolePermissions.countDocuments({
+      isActive: true,
+    });
+    
+
     const stats = {
       totalUsers,
       activeUsers,
       inactiveUsers,
       roleUserCounts,
+      totalRoles,
+      activeRoles,
+   
     };
     res.status(200).json(stats);
   } catch (error) {
@@ -135,7 +279,10 @@ const addNewRole = async (req: Request, res: Response) => {
         .status(400)
         .json({ message: "Role name and permissions are required" });
     }
-
+    const existingRole = await RolePermissions.findOne({ name });
+    if (existingRole) {
+      return res.status(400).json({ message: "Role name already exists" });
+    }
     const newRole = await RolePermissions.create({ name, permissions });
     res.status(201).json(newRole);
   } catch (error) {
@@ -157,14 +304,14 @@ const updateRole = async (req: Request, res: Response) => {
     if (!existingRole) {
       return res.status(404).json({ message: "Role not found" });
     }
-    if (name && existingRole.name === name) {
-      return res.status(400).json({ message: "Role name already exists" });
-    }
-    if (permissions && permissions === existingRole.permissions) {
-      return res
-        .status(400)
-        .json({ message: "Role permissions already exist" });
-    }
+    // if (name && existingRole.name === name) {
+    //   return res.status(400).json({ message: "Role name already exists" });
+    // }
+    // if (permissions && permissions === existingRole.permissions) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "Role permissions already exist" });
+    // }
     const updatedRole = await RolePermissions.findByIdAndUpdate(
       id,
       {
@@ -195,4 +342,11 @@ const getAllRoles = async (req: Request, res: Response) => {
     });
   }
 };
-export { exportUsersToCsv, getStats, addNewRole, updateRole, getAllRoles };
+export {
+  exportUsersToCsv,
+  getStats,
+  addNewRole,
+  updateRole,
+  getAllRoles,
+  exportUsersToExcel,
+};

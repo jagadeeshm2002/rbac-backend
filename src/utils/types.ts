@@ -1,3 +1,4 @@
+
 import { Document, FilterQuery, Types } from "mongoose";
 export type role = "admin" | "user" | "guest" | "manager" | "developer";
 export type permissions = "create" | "read" | "update" | "delete";
@@ -28,10 +29,16 @@ export interface IRolePermissionsDocument extends IRolePermissions, Document {
   updatedAt: Date;
 }
 
-export type jwtPayload = Pick<IUser, "email" | "role" | "username">;
+export type jwtPayload = Pick<IUser, "email" | "role" | "username" >;
 
 export interface customRequest extends Request {
   user: jwtPayload;
+}
+export interface ExportQuery {
+  isActive?: string;
+  role?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface getAllUserQuery extends FilterQuery<IUser> {

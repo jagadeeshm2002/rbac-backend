@@ -19,10 +19,9 @@ export const rolePermissionsValid = (
       if (!("user" in req)) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      console.log(req.user.role);
 
-      const userRole = req.user.role;
-      const hasValidRole = allowedRoles.includes(userRole.name);
+      const userRole = req?.user?.role;
+      const hasValidRole = allowedRoles.includes(userRole?.name);
       const hasPermission = userRole.permissions.includes(allowedPermissions);
 
       if (!hasValidRole || !hasPermission) {
