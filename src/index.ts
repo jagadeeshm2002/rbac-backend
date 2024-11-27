@@ -16,6 +16,8 @@ app.use(cors(corsOptions));
 const port = process.env.SERVER_PORT || 3000;
 
 app.use("/api", routes);
+app.use("/", (req, res) => res.send("Hello World!"));
+
 
 mongoose.connection.once("open", () => {
   console.log("Connected to MongoDB");
