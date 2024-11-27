@@ -38,3 +38,4 @@ coverage/
 # OS-Specific Files
 *.~lock.*
 *.bak
+.vercel
